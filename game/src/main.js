@@ -1,134 +1,238 @@
-// Boot and the one loop: input is read every frame, the world advances in fixed 1/60 s steps
-// (several in a slow frame, none in a fast one), and the renderer paints what is there. The game
-// moves between four screens: title, play, paused and game over.
-//
-// ?seed=N fixes the falling pattern. ?shot=start|play|end (with &seed=N) stages that scene
-// instead of running the loop, paints it twice and sets window.__shotReady for a screenshot.
-import { BEST_KEY, LIVES, STEP } from './config.js';
-import { createRandom } from './random.js';
-import { createWorld, EVENT_HIT, EVENT_OVER } from './world.js';
-import { ACTION_CONFIRM, ACTION_PAUSE, createInput } from './input.js';
-import { createRenderer, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
-import { stageShot } from './shots.js';
+// Sunfall City - Main Game Entry & Loop (Wiring Combat, Police, Missions & Respawns)
 
-/** The longest frame the loop catches up on; a longer stall (a hidden tab) is dropped, not replayed. */
-const MAX_FRAME = 0.25;
-
-const params = new URLSearchParams(window.location.search);
-const shot = params.get('shot');
-const seedParam = Number.parseInt(params.get('seed') ?? '', 10);
-const seed = Number.isInteger(seedParam) ? seedParam : Math.floor(Math.random() * 4294967296);
+import { CONFIG } from './config.js';
+import { setSeed } from './random.js';
+import { initCity, drawCity } from './city.js';
+import { spawnTraffic, getTrafficCars, updateTraffic, drawVehicles } from './vehicles.js';
+import { spawnPedestrians, updatePedestrians, drawPedestrians, getPedestrians } from './pedestrians.js';
+import { Player } from './player.js';
+import { Camera } from './camera.js';
+import { drawHUD, drawStartScreen, drawPauseOverlay } from './hud.js';
+import { initAudio, updateEngineSound, playHorn, playUIClick, playPunchSound } from './audio.js';
+import { handleScreenshotShot } from './shots.js';
+import { CombatSystem } from './combat.js';
+import { updatePolice, drawPolice, clearPolice } from './police.js';
+import { MissionManager } from './missions.js';
 
 const canvas = document.getElementById('game');
-const status = document.getElementById('status');
-const world = createWorld(createRandom(seed));
-const renderer = createRenderer(canvas);
+const ctx = canvas.getContext('2d');
 
-function readBest() {
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// Input management
+const input = {
+  keys: {},
+  keysJustPressed: {}
+};
+
+window.addEventListener('keydown', (e) => {
+  if (!input.keys[e.code]) {
+    input.keysJustPressed[e.code] = true;
+  }
+  input.keys[e.code] = true;
+
+  if (e.code === 'KeyH' && player.inVehicle) {
+    playHorn();
+  }
+  if (e.code === 'KeyF') {
+    if (combatSystem.punch(player, getPedestrians(), [], (val) => {
+      player.wantedLevel = Math.min(5, player.wantedLevel + val);
+    })) {
+      playPunchSound();
+    }
+  }
+  if (e.code === 'Enter' || e.code === 'Space') {
+    if (missionManager.missionState === 'dialogue' || missionManager.missionState === 'outro') {
+      missionManager.advanceDialogue(player);
+      playUIClick();
+    } else if (missionManager.missionState === 'idle' && Math.hypot(player.x - 500, player.y - 500) < 80) {
+      missionManager.startMissionDialogue();
+      playUIClick();
+    }
+  }
+});
+
+window.addEventListener('keyup', (e) => {
+  input.keys[e.code] = false;
+});
+
+// Game States: 'start', 'playing', 'paused'
+let gameState = 'start';
+
+// Initialize world entities
+setSeed(Date.now() % 10000);
+initCity();
+spawnTraffic(18);
+spawnPedestrians(28);
+
+const player = new Player(2000, 2000);
+const camera = new Camera();
+const combatSystem = new CombatSystem();
+const missionManager = new MissionManager();
+
+// Load save if exists
+try {
+  const saved = localStorage.getItem('sunfall-city-save');
+  if (saved) {
+    const data = JSON.parse(saved);
+    if (data.cash !== undefined) player.cash = data.cash;
+    if (data.x !== undefined) player.x = data.x;
+    if (data.y !== undefined) player.y = data.y;
+    if (data.missionIndex !== undefined) missionManager.currentMissionIndex = data.missionIndex;
+  }
+} catch (e) {}
+
+// Autosave every 30 seconds
+setInterval(() => {
   try {
-    return Number.parseInt(window.localStorage.getItem(BEST_KEY) ?? '0', 10) || 0;
-  } catch {
-    return 0;
-  }
+    localStorage.setItem('sunfall-city-save', JSON.stringify({
+      cash: player.cash,
+      x: player.x,
+      y: player.y,
+      missionIndex: missionManager.currentMissionIndex
+    }));
+  } catch (e) {}
+}, 30000);
+
+// Check screenshot staging query params
+const queryParams = new URLSearchParams(window.location.search);
+if (queryParams.has('shot')) {
+  handleScreenshotShot(ctx, queryParams);
+  throw new Error('Screenshot shot rendered successfully');
 }
 
-function saveBest(value) {
-  try {
-    window.localStorage.setItem(BEST_KEY, String(value));
-  } catch {
-    // Storage can be off (private windows): the best score then lasts this visit only.
+// Start interaction listener
+window.addEventListener('pointerdown', () => {
+  if (gameState === 'start') {
+    initAudio();
+    playUIClick();
+    gameState = 'playing';
+  } else if (missionManager.missionState === 'dialogue' || missionManager.missionState === 'outro') {
+    missionManager.advanceDialogue(player);
+    playUIClick();
   }
+});
+
+window.addEventListener('keydown', (e) => {
+  if (gameState === 'start' && (e.code === 'Enter' || e.code === 'Space')) {
+    initAudio();
+    playUIClick();
+    gameState = 'playing';
+  }
+  if (e.code === 'KeyP' || e.code === 'Escape') {
+    if (gameState === 'playing') {
+      gameState = 'paused';
+      playUIClick();
+    } else if (gameState === 'paused') {
+      gameState = 'playing';
+      playUIClick();
+    }
+  }
+});
+
+// Respawns
+function handleBusted() {
+  player.x = 1000; // Police station
+  player.y = 1000;
+  player.wantedLevel = 0;
+  player.cash = Math.max(0, player.cash - 500);
+  if (player.inVehicle && player.currentCar) {
+    player.inVehicle = false;
+    player.currentCar.isPlayerControlled = false;
+    player.currentCar = null;
+  }
+  clearPolice();
 }
 
-function runShot(name) {
-  const scene = stageShot(name, world);
-  let painted = 0;
-  function paint() {
-    renderer.draw(world.state, scene.screen, scene.best);
-    painted += 1;
-    if (painted < 2) requestAnimationFrame(paint);
-    else window.__shotReady = true;
+function handleWasted() {
+  player.x = 3000; // Hospital
+  player.y = 1000;
+  player.health = 100;
+  player.wantedLevel = 0;
+  player.cash = Math.max(0, player.cash - 200);
+  if (player.inVehicle && player.currentCar) {
+    player.inVehicle = false;
+    player.currentCar.isPlayerControlled = false;
+    player.currentCar = null;
   }
-  requestAnimationFrame(paint);
+  clearPolice();
 }
 
-function runGame() {
-  const input = createInput(canvas);
-  let screen = SCREEN_TITLE;
-  let best = readBest();
-  let accumulator = 0;
-  let last = performance.now();
+// Main Game Loop
+let lastTime = performance.now();
 
-  // Screen readers (and anyone watching the page's text) hear the screen changes and each hit.
-  function announce(message) {
-    status.textContent = message;
+function gameLoop(time) {
+  const dt = (time - lastTime) / 16.66;
+  lastTime = time;
+
+  // Clear canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (gameState === 'start') {
+    camera.x = 300;
+    camera.y = 1200 + Math.sin(time * 0.0005) * 100;
+    drawStartScreen(ctx, camera);
+  } else if (gameState === 'playing') {
+    // Update entities
+    const traffic = getTrafficCars();
+    const peds = getPedestrians();
+
+    player.update(input, traffic, dt);
+    updateTraffic(input, dt);
+    updatePedestrians(player, traffic, dt, (val) => {
+      player.wantedLevel = Math.min(5, player.wantedLevel + val);
+    });
+    updatePolice(player, traffic, dt, handleBusted, handleWasted);
+    combatSystem.update(dt);
+    missionManager.update(player, dt);
+    camera.update(player, canvas.width, canvas.height);
+
+    // Audio update
+    const isDriving = player.inVehicle && player.currentCar;
+    const speed = isDriving ? player.currentCar.speed : 0;
+    updateEngineSound(isDriving, speed);
+
+    // Render world
+    ctx.save();
+    ctx.translate(-camera.x, -camera.y);
+    drawCity(ctx, camera);
+    drawPedestrians(ctx);
+    drawVehicles(ctx);
+    drawPolice(ctx);
+    missionManager.drawMissionMarkers(ctx, player);
+    player.draw(ctx);
+    combatSystem.drawPunch(ctx, player);
+    ctx.restore();
+
+    // Render HUD
+    drawHUD(ctx, player, traffic, missionManager);
+  } else if (gameState === 'paused') {
+    // Render world behind pause
+    const traffic = getTrafficCars();
+    ctx.save();
+    ctx.translate(-camera.x, -camera.y);
+    drawCity(ctx, camera);
+    drawPedestrians(ctx);
+    drawVehicles(ctx);
+    drawPolice(ctx);
+    player.draw(ctx);
+    ctx.restore();
+    drawHUD(ctx, player, traffic, missionManager);
+
+    drawPauseOverlay(ctx);
   }
 
-  function startGame() {
-    world.reset();
-    accumulator = 0;
-    screen = SCREEN_PLAY;
-    announce(`Playing. ${LIVES} lives.`);
+  // Clear just-pressed inputs for next frame
+  for (const key in input.keysJustPressed) {
+    input.keysJustPressed[key] = false;
   }
 
-  function endGame() {
-    screen = SCREEN_OVER;
-    if (world.state.score > best) {
-      best = world.state.score;
-      saveBest(best);
-    }
-    announce(`Game over. Score ${world.state.score}. Best ${best}.`);
-  }
-
-  function handleActions() {
-    const actions = input.takeActions();
-    if (actions & ACTION_CONFIRM && (screen === SCREEN_TITLE || screen === SCREEN_OVER)) startGame();
-    else if (actions & ACTION_PAUSE && screen === SCREEN_PLAY) {
-      screen = SCREEN_PAUSED;
-      announce('Paused.');
-    } else if (actions & (ACTION_PAUSE | ACTION_CONFIRM) && screen === SCREEN_PAUSED) {
-      screen = SCREEN_PLAY;
-      announce('Playing.');
-    }
-  }
-
-  function step() {
-    if (screen === SCREEN_TITLE) {
-      world.step(STEP, 0, true);
-      return;
-    }
-    const events = world.step(STEP, input.direction(), false);
-    if (events & EVENT_OVER) endGame();
-    else if (events & EVENT_HIT) announce(world.state.lives === 1 ? 'Hit. 1 life left.' : `Hit. ${world.state.lives} lives left.`);
-  }
-
-  function frame(now) {
-    requestAnimationFrame(frame);
-    accumulator += Math.min((now - last) / 1000, MAX_FRAME);
-    last = now;
-    handleActions();
-    if (screen === SCREEN_TITLE || screen === SCREEN_PLAY) {
-      while (accumulator >= STEP && (screen === SCREEN_TITLE || screen === SCREEN_PLAY)) {
-        step();
-        accumulator -= STEP;
-      }
-    } else {
-      accumulator = 0;
-    }
-    renderer.draw(world.state, screen, best);
-  }
-
-  // Leaving the tab pauses a running game rather than letting blocks fall unseen.
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden && screen === SCREEN_PLAY) {
-      screen = SCREEN_PAUSED;
-      announce('Paused.');
-    }
-  });
-
-  announce('Block Dodger. Press Space or click to start.');
-  requestAnimationFrame(frame);
+  requestAnimationFrame(gameLoop);
 }
 
-if (shot) runShot(shot);
-else runGame();
+requestAnimationFrame(gameLoop);

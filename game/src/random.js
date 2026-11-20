@@ -1,12 +1,51 @@
-// A small seeded random number generator (mulberry32): the same seed gives the same game,
-// which is what makes the screenshot scenes repeatable.
+// Seeded Random Number Generator for Sunfall City
 
-export function createRandom(seed) {
-  let a = seed | 0;
-  return function random() {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+export class Random {
+  constructor(seed = 1) {
+    this.seed = seed % 2147483647;
+    if (this.seed <= 0) this.seed += 2147483646;
+  }
+
+  next() {
+    this.seed = (this.seed * 16807) % 2147483647;
+    return (this.seed - 1) / 2147483646;
+  }
+
+  range(min, max) {
+    return min + this.next() * (max - min);
+  }
+
+  int(min, max) {
+    return Math.floor(this.range(min, max + 1));
+  }
+
+  choice(arr) {
+    return arr[this.int(0, arr.length - 1)];
+  }
+
+  chance(probability = 0.5) {
+    return this.next() < probability;
+  }
+}
+
+let globalRng = new Random(1);
+
+export function setSeed(seed) {
+  globalRng = new Random(seed);
+}
+
+export function rngNext() {
+  return globalRng.next();
+}
+
+export function rngRange(min, max) {
+  return globalRng.range(min, max);
+}
+
+export function rngInt(min, max) {
+  return globalRng.int(min, max);
+}
+
+export function rngChoice(arr) {
+  return globalRng.choice(arr);
 }
