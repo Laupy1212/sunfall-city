@@ -1,4 +1,4 @@
-// Sunfall City - Screenshot Staging
+// Automated Screenshot Rendering Staging for Documentation and Press Kits
 
 import { CONFIG } from './config.js';
 import { setSeed, rngRange, rngChoice, rngInt } from './random.js';

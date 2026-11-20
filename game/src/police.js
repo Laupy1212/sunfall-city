@@ -1,4 +1,4 @@
-// Sunfall City - Police System, Wanted Level, Pursuit & Busted/Wasted Flows
+// Police Pursuit AI, Wanted Level Tracking, and Busted/Wasted State Machine
 
 import { CONFIG } from './config.js';
 import { rngRange, rngChoice } from './random.js';

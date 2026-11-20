@@ -1,4 +1,4 @@
-// Sunfall City - Main Game Entry & Loop (Wiring Combat, Police, Missions & Respawns)
+// Game Entry Point, Lifecycle Management, and Core Event Loop
 
 import { CONFIG } from './config.js';
 import { setSeed } from './random.js';

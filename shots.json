@@ -1,6 +1,6 @@
 [
-  { "name": "1-start.jpg", "query": "?shot=start&seed=1" },
-  { "name": "2-city.jpg", "query": "?shot=city&seed=1" },
-  { "name": "3-chase.jpg", "query": "?shot=chase&seed=1" },
-  { "name": "4-mission.jpg", "query": "?shot=mission&seed=1" }
+  { "name": "1-start.jpg", "query": "?shot=start&seed=1", "description": "Title screen and game start" },
+  { "name": "2-city.jpg", "query": "?shot=city&seed=1", "description": "Coastal city overview" },
+  { "name": "3-chase.jpg", "query": "?shot=chase&seed=1", "description": "Police chase and vehicle action" },
+  { "name": "4-mission.jpg", "query": "?shot=mission&seed=1", "description": "Story campaign mission dialogue" }
 ]

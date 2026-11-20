@@ -1,4 +1,4 @@
-// Sunfall City - Procedural City Generation & World Map (Polished Visuals & Set Dressing)
+// Procedural City Layout, Buildings, Parks, and World Landmarks Generation
 
 import { CONFIG } from './config.js';
 import { rngInt, rngChoice, rngRange } from './random.js';

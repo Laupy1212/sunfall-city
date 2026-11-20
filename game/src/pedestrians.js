@@ -1,4 +1,4 @@
-// Sunfall City - Pedestrians AI & Knockdown Mechanics
+// Pedestrian Citizens AI, Movement, and Vehicle Impact Reactions
 
 import { CONFIG } from './config.js';
 import { rngRange, rngChoice, rngInt } from './random.js';

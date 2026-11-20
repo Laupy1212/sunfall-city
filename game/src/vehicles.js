@@ -1,4 +1,4 @@
-// Sunfall City - Vehicles & Traffic AI (Polished Two-Tone Cars & Lighting)
+// Traffic Vehicles Physics, Rendering, and AI Navigation
 
 import { CONFIG } from './config.js';
 import { getBuildings } from './city.js';

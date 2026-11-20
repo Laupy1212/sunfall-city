@@ -1,4 +1,4 @@
-// Sunfall City - Light On-Foot Combat & Punch System
+// On-Foot Punch Combat System and Hit Detection Mechanics
 
 export class CombatSystem {
   constructor() {

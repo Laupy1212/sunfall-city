@@ -1,4 +1,4 @@
-// Seeded Random Number Generator for Sunfall City
+// Seeded Pseudo-Random Number Generator for Procedural World Generation
 
 export class Random {
   constructor(seed = 1) {

@@ -1,4 +1,4 @@
-// Sunfall City - WebAudio Synth & Sound Effects
+// Web Audio Synthesizer for Engine Hum, Horns, Punches, and UI Clicks
 
 let audioCtx = null;
 let engineOsc = null;

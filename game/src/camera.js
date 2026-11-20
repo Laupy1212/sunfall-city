@@ -1,4 +1,4 @@
-// Sunfall City - Smooth Follow Camera with Dynamic Look-Ahead
+// Smooth Viewport Camera with Dynamic Speed-Based Look-Ahead
 
 import { CONFIG } from './config.js';
 

@@ -1,4 +1,4 @@
-// Sunfall City - Story Campaign & Missions for Marina Vale
+// Four-Mission Story Campaign for Courier Marina Vale and Objective Management
 
 export const MISSIONS = [
   {

@@ -1,4 +1,4 @@
-// Sunfall City - Player Character (Marina Vale)
+// Player Character (Marina Vale) Movement, Car Entry, and Collisions
 
 import { CONFIG } from './config.js';
 import { getBuildings } from './city.js';

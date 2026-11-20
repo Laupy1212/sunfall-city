@@ -1,4 +1,4 @@
-// Sunfall City Configuration & Constants (Tuned for Session 2 Crime & Courier Epic)
+// Sunfall City Configuration and Gameplay Constants
 
 export const CONFIG = {
   WORLD_WIDTH: 4000,

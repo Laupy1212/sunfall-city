@@ -1,4 +1,4 @@
-// Sunfall City - HUD, Minimap & UI Screens (Polished Contrast & Start Screen)
+// Heads-Up Display, Minimap, Menus, and Objective Overlays
 
 import { CONFIG } from './config.js';
 import { getBustMeter } from './police.js';
